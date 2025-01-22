@@ -7,12 +7,13 @@ def plot_runtimes(filename: str):
     runtimes = {
         "AER Simulator": (1.19, 6.08, 12.93, 33.46),
         "QExa20": (334.30, 413.90, 607.27, 589.31),
+        "AQT20": (334.30, 413.90, 607.27, 589.31),
     }
 
     # plt.bar(qubits, runtime, width=0.25, label="AER Simulator")
 
     x = np.arange(len(qubits))  # the label locations
-    width = 0.25  # the width of the bars
+    width = 0.32  # the width of the bars
     multiplier = 0
 
     fig, ax = plt.subplots(layout="constrained")

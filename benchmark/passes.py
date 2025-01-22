@@ -5,7 +5,7 @@ Source: https://docs.quantum.ibm.com/guides/custom-transpiler-pass
 
 from qiskit.dagcircuit import DAGCircuit
 from qiskit.circuit import QuantumRegister, Gate
-from qiskit.circuit.library import CXGate, ECRGate
+from qiskit.circuit.library import CXGate, ECRGate, RZZGate
 from qiskit.transpiler.basepasses import TransformationPass
 from qiskit.quantum_info import Operator, pauli_basis
 
@@ -27,7 +27,7 @@ class PauliTwirl(TransformationPass):
                 two-qubit basis gates, `cx` and `ecr` for IBM backends.
         """
         if gates_to_twirl is None:
-            gates_to_twirl = [CXGate(), ECRGate()]
+            gates_to_twirl = [CXGate(), ECRGate(), RZZGate(theta=0)]
         self.gates_to_twirl = gates_to_twirl
         self.build_twirl_set()
         super().__init__()
@@ -63,7 +63,7 @@ class PauliTwirl(TransformationPass):
         for node in dag.op_nodes():
             if not isinstance(node.op, twirling_gate_classes):
                 continue
-
+            
             # random integer to select Pauli twirl pair
             pauli_index = np.random.randint(0, len(self.twirl_set[node.op.name]))
             twirl_pair = self.twirl_set[node.op.name][pauli_index]

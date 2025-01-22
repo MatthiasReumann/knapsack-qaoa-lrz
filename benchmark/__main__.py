@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import dotenv
 
@@ -6,10 +7,6 @@ import numpy as np
 
 from docplex.mp.model import Model
 from docplex.mp.solution import SolveSolution
-
-import mqp.qiskit_provider as mqp_qiskit
-
-from qiskit_aer import Aer
 
 from qiskit_optimization.applications import Knapsack
 from qiskit_optimization.algorithms import MinimumEigenOptimizer
@@ -21,8 +18,9 @@ from qiskit.transpiler import PassManager, StagedPassManager
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 
 from qiskit.primitives import BackendSampler
+from qiskit.providers import Backend
 
-from passes import PauliTwirl
+from .passes import PauliTwirl
 
 dotenv.load_dotenv()
 
@@ -49,20 +47,25 @@ def qaoa_callback(
     print(it, params, obj)
 
 
-def run_benchmark(backend, sack: CustomKnapsack, repeats: int = 5):
+def run_benchmark(
+    backend: Backend, sack: CustomKnapsack, repeats: int = 5
+):
     # Setup QAOA and different types of optimization.
     base_pm = generate_preset_pass_manager(
-        backend=backend, optimization_level=0, seed_transpiler=42
+        backend=backend,
+        optimization_level=3,
+        seed_transpiler=42,
     )
-    final_pm = PassManager([PauliTwirl()])
+    twirl_pm = PassManager([PauliTwirl()])
 
     staged_pm = StagedPassManager(
-        stages=["base", "final"], base=base_pm, final=final_pm
+        stages=["twirl", "base"], twirl=twirl_pm, base=base_pm
     )
     sampler = BackendSampler(
-        backend=backend, options={"shots": 1024}, bound_pass_manager=staged_pm
+        backend=backend, options={"shots": 1024}, bound_pass_manager=base_pm, skip_transpilation=True
     )
     qaoa = QAOA(sampler=sampler, optimizer=COBYLA())
+
     problem = sack.to_quadratic_program()
 
     # Classical optimization.
@@ -100,22 +103,31 @@ def run_benchmark(backend, sack: CustomKnapsack, repeats: int = 5):
     return sum_hamming / repeats, sum_delta / repeats
 
 
-def run_benchmarks(backends: dict, problems: dict[str, CustomKnapsack]):
-    print("backend; qubits; avg_hamming; avg_delta")
-    for backend_name, backend in backends.items():
-        for q, sack in problems.items():
-            avg_hamming, avg_delta = run_benchmark(backend, sack, repeats=1)
-            print(f"{backend_name}; {q}; {avg_hamming}; {avg_delta}")
+def run_benchmarks(backend: Backend, problems: dict[str, CustomKnapsack]):
+    for q, sack in problems.items():
+        print(f"#Q={q}")
+        run_benchmark(backend, sack, repeats=1)
 
+def aer_simulator() -> Backend:
+    from qiskit_aer import Aer
+    return Aer.get_backend("aer_simulator")
+
+def qexa20() -> Backend:
+    from mqp.qiskit_provider import MQPProvider
+    provider = MQPProvider(token=os.getenv("MQP_TOKEN"))
+    return provider.get_backend("QExa20")
+
+def aqt20() -> Backend:
+    from qiskit_aqt_provider import AQTProvider
+    aqt = AQTProvider(access_token=os.getenv("AQT_TOKEN"))
+    return aqt.get_backend("marmot", workspace="lrz")
 
 if __name__ == "__main__":
     # Setup backends.
-    provider = mqp_qiskit.MQPProvider(token=os.getenv("MQP_TOKEN"))
     backends = {
-        # "aer": Aer.get_backend("aer_simulator"),
-        # "qexa20": provider.get_backend("QExa20"),
-        # "q20": provider.get_backend("Q20"),
-        "aqt20": provider.get_backend("AQT20"),
+        #"aer": aer_simulator(),
+        #"qexa20": qexa20(),
+        "aqt20": aqt20(),
     }
 
     # Define the problems.
@@ -143,4 +155,7 @@ if __name__ == "__main__":
     }
 
     # Run benchmarks.
-    run_benchmarks(backends, problems)
+    if len(sys.argv) < 2:
+        raise RuntimeError("<qc> parameter missing.")
+
+    run_benchmarks(backend=backends[sys.argv[1]], problems=problems)
