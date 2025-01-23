@@ -62,7 +62,7 @@ def run_benchmark(
         stages=["twirl", "base"], twirl=twirl_pm, base=base_pm
     )
     sampler = BackendSampler(
-        backend=backend, options={"shots": 1024}, bound_pass_manager=base_pm, skip_transpilation=True
+        backend=backend, options={"shots": 1024}, bound_pass_manager=base_pm
     )
     qaoa = QAOA(sampler=sampler, optimizer=COBYLA())
 
@@ -117,6 +117,11 @@ def qexa20() -> Backend:
     provider = MQPProvider(token=os.getenv("MQP_TOKEN"))
     return provider.get_backend("QExa20")
 
+def q20() -> Backend:
+    from mqp.qiskit_provider import MQPProvider
+    provider = MQPProvider(token=os.getenv("MQP_TOKEN"))
+    return provider.get_backend("Q20")
+
 def aqt20() -> Backend:
     from qiskit_aqt_provider import AQTProvider
     aqt = AQTProvider(access_token=os.getenv("AQT_TOKEN"))
@@ -127,7 +132,8 @@ if __name__ == "__main__":
     backends = {
         #"aer": aer_simulator(),
         #"qexa20": qexa20(),
-        "aqt20": aqt20(),
+        # "aqt20": aqt20(),
+        "q20": q20(),
     }
 
     # Define the problems.
